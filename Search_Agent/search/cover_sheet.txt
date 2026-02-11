@@ -1,0 +1,5 @@
+Your name:
+Your NetID:
+Your partner's name (if any):
+Your partner's NetID (if any):
+Number of late days I'd like to use (max 2):
