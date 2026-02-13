@@ -558,7 +558,28 @@ def foodHeuristic(state: Tuple[Tuple, List[List]], problem: FoodSearchProblem):
     """
     position, foodGrid = state
     "*** YOUR CODE HERE ***"
-    return 0
+
+    foodList = foodGrid.asList()
+
+    if len(foodList) == 0:
+        return 0
+
+    def manhattan_distance(pos1, pos2):
+        return abs(pos1[0] - pos2[0]) + abs(pos1[1] - pos2[1])
+
+    if len(foodList) == 1:
+        return manhattan_distance(position, foodList[0])
+    distances = [manhattan_distance(position, food) for food in foodList]
+    nearest_dist = min(distances)
+    nearest_idx = distances.index(nearest_dist)
+    nearest_food = foodList[nearest_idx]
+    max_dist_from_nearest = 0
+    for food in foodList:
+        if food != nearest_food:
+            dist = manhattan_distance(nearest_food, food)
+            max_dist_from_nearest = max(max_dist_from_nearest, dist)
+
+    return nearest_dist + max_dist_from_nearest
 
 
 class ClosestDotSearchAgent(SearchAgent):
