@@ -336,7 +336,7 @@ class CornersProblem(search.SearchProblem):
         for corner in self.corners:
             if not startingGameState.hasFood(*corner):
                 print("Warning: no food in corner " + str(corner))
-        self._expanded = 0  # DO NOT CHANGE; Number of search nodes expanded
+        self._expanded = 0
 
     def getStartState(self):
         """
@@ -426,8 +426,8 @@ def cornersHeuristic(state: Any, problem: CornersProblem):
     shortest path from the state to a goal of the problem; i.e.  it should be
     admissible.
     """
-    corners = problem.corners  # These are the corner coordinates
-    walls = problem.walls  # These are the walls of the maze, as a Grid (game.py)
+    corners = problem.corners
+    walls = problem.walls
 
     "*** YOUR CODE HERE ***"
     position, corners_visited = state
