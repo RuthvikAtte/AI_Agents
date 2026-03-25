@@ -4,7 +4,7 @@
 # educational purposes provided that (1) you do not distribute or publish
 # solutions, (2) you retain this notice, and (3) you provide clear
 # attribution to UC Berkeley, including a link to http://ai.berkeley.edu.
-# 
+#
 # Attribution Information: The Pacman AI projects were developed at UC Berkeley.
 # The core projects and autograders were primarily created by John DeNero
 # (denero@cs.berkeley.edu) and Dan Klein (klein@cs.berkeley.edu).
@@ -67,15 +67,31 @@ class ReflexAgent(Agent):
         Print out these variables to see what you're getting, then combine them
         to create a masterful evaluation function.
         """
-        # Useful information you can extract from a GameState (pacman.py)
         successorGameState = currentGameState.generatePacmanSuccessor(action)
         newPos = successorGameState.getPacmanPosition()
         newFood = successorGameState.getFood()
         newGhostStates = successorGameState.getGhostStates()
         newScaredTimes = [ghostState.scaredTimer for ghostState in newGhostStates]
 
-        "*** YOUR CODE HERE ***"
-        return successorGameState.getScore()
+        val = successorGameState.getScore()
+
+        fl = newFood.asList()
+        if fl:
+            dd = [manhattanDistance(newPos, f) for f in fl]
+            val += 1.0 / min(dd)
+
+        for i, gs in enumerate(newGhostStates):
+            gp = gs.getPosition()
+            gd = manhattanDistance(newPos, gp)
+            if newScaredTimes[i] > 0:
+                val += 2.0 / (gd + 0.001)
+            else:
+                if gd < 2:
+                    val -= 9999
+                elif gd < 4:
+                    val -= 50.0 / gd
+
+        return val
 
 def scoreEvaluationFunction(currentGameState: GameState):
     """
@@ -135,8 +151,28 @@ class MinimaxAgent(MultiAgentSearchAgent):
         gameState.isLose():
         Returns whether or not the game state is a losing state
         """
-        "*** YOUR CODE HERE ***"
-        util.raiseNotDefined()
+        def mm(st, ag, dp):
+            if st.isWin() or st.isLose() or dp == 0:
+                return self.evaluationFunction(st)
+            na = st.getNumAgents()
+            acts = st.getLegalActions(ag)
+            nxt = (ag + 1) % na
+            ndp = dp - 1 if ag == na - 1 else dp
+            if ag == 0:
+                return max(mm(st.generateSuccessor(ag, a), nxt, ndp) for a in acts)
+            else:
+                return min(mm(st.generateSuccessor(ag, a), nxt, ndp) for a in acts)
+
+        na = gameState.getNumAgents()
+        acts = gameState.getLegalActions(0)
+        best = None
+        bv = float('-inf')
+        for a in acts:
+            v = mm(gameState.generateSuccessor(0, a), 1 % na, self.depth if na > 1 else self.depth - 1)
+            if v > bv:
+                bv = v
+                best = a
+        return best
 
 class AlphaBetaAgent(MultiAgentSearchAgent):
     """
@@ -147,8 +183,43 @@ class AlphaBetaAgent(MultiAgentSearchAgent):
         """
         Returns the minimax action using self.depth and self.evaluationFunction
         """
-        "*** YOUR CODE HERE ***"
-        util.raiseNotDefined()
+        def maxv(st, dp, al, be):
+            if st.isWin() or st.isLose() or dp == 0:
+                return self.evaluationFunction(st)
+            v = float('-inf')
+            for a in st.getLegalActions(0):
+                v = max(v, minv(st.generateSuccessor(0, a), 1, dp, al, be))
+                if v > be:
+                    return v
+                al = max(al, v)
+            return v
+
+        def minv(st, ag, dp, al, be):
+            if st.isWin() or st.isLose():
+                return self.evaluationFunction(st)
+            na = st.getNumAgents()
+            v = float('inf')
+            for a in st.getLegalActions(ag):
+                if ag == na - 1:
+                    v = min(v, maxv(st.generateSuccessor(ag, a), dp - 1, al, be))
+                else:
+                    v = min(v, minv(st.generateSuccessor(ag, a), ag + 1, dp, al, be))
+                if v < al:
+                    return v
+                be = min(be, v)
+            return v
+
+        al = float('-inf')
+        be = float('inf')
+        best = None
+        bv = float('-inf')
+        for a in gameState.getLegalActions(0):
+            v = minv(gameState.generateSuccessor(0, a), 1, self.depth, al, be)
+            if v > bv:
+                bv = v
+                best = a
+            al = max(al, bv)
+        return best
 
 class ExpectimaxAgent(MultiAgentSearchAgent):
     """
@@ -162,18 +233,71 @@ class ExpectimaxAgent(MultiAgentSearchAgent):
         All ghosts should be modeled as choosing uniformly at random from their
         legal moves.
         """
-        "*** YOUR CODE HERE ***"
-        util.raiseNotDefined()
+        def exmax(st, ag, dp):
+            if st.isWin() or st.isLose() or dp == 0:
+                return self.evaluationFunction(st)
+            na = st.getNumAgents()
+            acts = st.getLegalActions(ag)
+            nxt = (ag + 1) % na
+            ndp = dp - 1 if ag == na - 1 else dp
+            if ag == 0:
+                return max(exmax(st.generateSuccessor(ag, a), nxt, ndp) for a in acts)
+            else:
+                vs = [exmax(st.generateSuccessor(ag, a), nxt, ndp) for a in acts]
+                return sum(vs) / len(vs)
+
+        na = gameState.getNumAgents()
+        acts = gameState.getLegalActions(0)
+        best = None
+        bv = float('-inf')
+        for a in acts:
+            v = exmax(gameState.generateSuccessor(0, a), 1 % na, self.depth if na > 1 else self.depth - 1)
+            if v > bv:
+                bv = v
+                best = a
+        return best
 
 def betterEvaluationFunction(currentGameState: GameState):
     """
     Your extreme ghost-hunting, pellet-nabbing, food-gobbling, unstoppable
     evaluation function (question 5).
 
-    DESCRIPTION: <write something here so we know what you did>
+    DESCRIPTION: Uses reciprocal of food distance, ghost proximity penalties/bonuses,
+    capsule proximity, and raw score as features.
     """
-    "*** YOUR CODE HERE ***"
-    util.raiseNotDefined()
+    pos = currentGameState.getPacmanPosition()
+    fd = currentGameState.getFood().asList()
+    gs = currentGameState.getGhostStates()
+    caps = currentGameState.getCapsules()
+    sc = currentGameState.getScore()
+
+    res = sc
+
+    if fd:
+        dists = [manhattanDistance(pos, f) for f in fd]
+        res += 9.0 / min(dists)
+        res -= 0.1 * len(fd)
+
+    for g in gs:
+        gp = g.getPosition()
+        gd = manhattanDistance(pos, gp)
+        if g.scaredTimer > 0:
+            res += 200.0 / (gd + 1)
+        else:
+            if gd <= 1:
+                res -= 600
+            elif gd <= 3:
+                res -= 80.0 / gd
+            else:
+                res -= 5.0 / gd
+
+    for c in caps:
+        cd = manhattanDistance(pos, c)
+        res += 15.0 / (cd + 1)
+
+    res -= 20 * len(caps)
+
+    return res
 
 # Abbreviation
 better = betterEvaluationFunction
